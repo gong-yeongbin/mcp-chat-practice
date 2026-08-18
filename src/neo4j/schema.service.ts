@@ -62,20 +62,28 @@ export class SchemaService {
     };
   }
 
-  /** db.schema.visualization()은 가상 노드/관계를 준다. 이름만 뽑아 (from)-[:TYPE]->(to)로 만든다. */
+  /**
+   * db.schema.visualization()은 가상 노드/관계를 준다.
+   *
+   * 관계의 start/end는 노드 객체가 아니라 가상 노드의 id다. 레이블 이름은 노드의
+   * properties.name에 들어 있으므로, id로 노드를 찾아 (from)-[:TYPE]->(to)를 만든다.
+   */
   private extractPatterns(row: { get(key: string): unknown } | undefined): GraphSchema['patterns'] {
     if (!row) return [];
 
+    const nodes = (row.get('nodes') ?? []) as { elementId: string; properties: { name?: string } }[];
+    const nameByElementId = new Map(nodes.map((node) => [node.elementId, node.properties.name ?? '?']));
+
     const relationships = (row.get('relationships') ?? []) as {
       type: string;
-      start: { properties: { name?: string } };
-      end: { properties: { name?: string } };
+      startNodeElementId: string;
+      endNodeElementId: string;
     }[];
 
     return relationships.map((rel) => ({
-      from: rel.start.properties.name ?? '?',
+      from: nameByElementId.get(rel.startNodeElementId) ?? '?',
       type: rel.type,
-      to: rel.end.properties.name ?? '?',
+      to: nameByElementId.get(rel.endNodeElementId) ?? '?',
     }));
   }
 }
